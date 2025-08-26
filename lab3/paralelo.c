@@ -112,8 +112,8 @@ int main(int argc, char *argv[]) {
 
     printf("Produto interno concorrente = %.6f\n", total_conc);
     printf("Produto interno sequencial = %.6f\n", total_seq);
-    printf("Variação relativa = %.6f", e);
-    printf("Tempo de execução concorrente = %.6fs\n", tempo_execucao);
+    printf("Variacao relativa = %.6f\n", e);
+    printf("Tempo de execucao concorrente = %.6fs\n", tempo_execucao);
     
     free(a);
     free(b);
