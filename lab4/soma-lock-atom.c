@@ -30,8 +30,10 @@ void *ExecutaTarefa (void *arg) {
 void *extra (void *args) {
   printf("Extra : esta executando...\n");
   for (int i=0; i<10000; i++) {
+    pthread_mutex_lock(&mutex);
      if (!(soma%10)) //imprime se 'soma' for multiplo de 10
         printf("soma = %ld \n", soma);
+    pthread_mutex_unlock(&mutex);
   }
   printf("Extra : terminou!\n");
   pthread_exit(NULL);
