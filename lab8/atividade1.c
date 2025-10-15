@@ -4,6 +4,7 @@
 #include <semaphore.h>
 #include <unistd.h>
 #include <math.h>
+#include <time.h>
 
 int *canal;
 int N, M;
@@ -12,6 +13,7 @@ int consumidores;
 int count_primos = 0;
 int *primos_thread;
 int producao_terminou = 0;
+int ocupados = 0;
 
 sem_t mutex;
 sem_t cheio;
@@ -34,21 +36,22 @@ void *produtor(void *arg) {
         sem_wait(&produtor_ok);
 
         for (int j = 0; j < M && i <= N; j++, i++) {
-            sem_wait(&vazio);  
+            sem_wait(&vazio);
             sem_wait(&mutex);
 
             canal[in] = i;
             in = (in + 1) % M;
+            ocupados++;
 
             sem_post(&mutex);
-            sem_post(&cheio);  
+            sem_post(&cheio);
         }
     }
 
     producao_terminou = 1;
 
     for (int i = 0; i < consumidores; i++)
-        sem_post(&cheio);  
+        sem_post(&cheio);
 
     pthread_exit(NULL);
 }
@@ -58,23 +61,27 @@ void *consumidor(void *arg) {
     int local_primos = 0;
 
     while (1) {
-        sem_wait(&cheio); 
+        sem_wait(&cheio);
 
-        if (producao_terminou && sem_trywait(&mutex) == 0) {
+        sem_wait(&mutex);
+
+        if (producao_terminou && ocupados == 0) {
             sem_post(&mutex);
+            sem_post(&cheio);
             break;
         }
 
-        sem_wait(&mutex);
         int num = canal[out];
         out = (out + 1) % M;
-        int buffer_vazio = (in == out);  
-        sem_post(&mutex);
+        ocupados--;
 
-        sem_post(&vazio);  
+        int buffer_vazio = (ocupados == 0 && !producao_terminou);
+
+        sem_post(&mutex);
+        sem_post(&vazio);
 
         if (buffer_vazio)
-            sem_post(&produtor_ok);  
+            sem_post(&produtor_ok);
 
         if (ehPrimo(num))
             local_primos++;
@@ -88,14 +95,19 @@ void *consumidor(void *arg) {
 }
 
 int main() {
-    printf("Digite a quantidade de números a gerar: ");
+    clock_t inicio, fim;
+    double tempo_execucao;
+
+    printf("Digite a quantidade de numeros a gerar: ");
     scanf("%d", &N);
 
     printf("Digite o tamanho do buffer: ");
     scanf("%d", &M);
 
-    printf("Digite o número de threads consumidoras: ");
+    printf("Digite o numero de threads consumidoras: ");
     scanf("%d", &consumidores);
+
+    inicio = clock();
 
     canal = malloc(M * sizeof(int));
     primos_thread = calloc(consumidores, sizeof(int));
@@ -103,7 +115,7 @@ int main() {
     sem_init(&mutex, 0, 1);
     sem_init(&cheio, 0, 0);
     sem_init(&vazio, 0, M);
-    sem_init(&produtor_ok, 0, 1);  
+    sem_init(&produtor_ok, 0, 1);
 
     pthread_t t_produtor;
     pthread_t t_consumidores[consumidores];
@@ -120,14 +132,22 @@ int main() {
     for (int i = 0; i < consumidores; i++)
         pthread_join(t_consumidores[i], NULL);
 
+    fim = clock();
+    tempo_execucao = (double)(fim - inicio) / CLOCKS_PER_SEC;
+
     int vencedor = 0;
     for (int i = 1; i < consumidores; i++)
         if (primos_thread[i] > primos_thread[vencedor])
             vencedor = i;
 
-    printf("\nTotal de números primos encontrados: %d\n", count_primos);
+    printf("\nQuantidade de primos encontrados por cada thread:\n");
+    for (int i = 0; i < consumidores; i++)
+        printf("Thread %d: %d primos\n", i, primos_thread[i]);
+
+    printf("\nTotal de numeros primos encontrados: %d\n", count_primos);
     printf("Thread vencedora: %d (encontrou %d primos)\n",
            vencedor, primos_thread[vencedor]);
+    printf("Tempo de execucao: %.4f segundos\n", tempo_execucao);
 
     free(canal);
     free(primos_thread);
